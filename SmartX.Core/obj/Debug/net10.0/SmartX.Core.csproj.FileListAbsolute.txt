@@ -1,0 +1,11 @@
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\bin\Debug\net10.0\SmartX.Core.deps.json
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\bin\Debug\net10.0\SmartX.Core.dll
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\bin\Debug\net10.0\SmartX.Core.pdb
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\SmartX.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\SmartX.Core.AssemblyInfoInputs.cache
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\SmartX.Core.AssemblyInfo.cs
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\SmartX.Core.csproj.CoreCompileInputs.cache
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\SmartX.Core.dll
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\refint\SmartX.Core.dll
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\SmartX.Core.pdb
+C:\Users\thabo\Downloads\prog7312-2026-poe-st10453046-main\prog7312-2026-poe-st10453046-main\SmartX.Core\obj\Debug\net10.0\ref\SmartX.Core.dll
