@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SmartX.Core.Models;
 using SmartX.Core.Services;
+using System.Text.RegularExpressions;
 
 namespace SmartX.Api.Controllers;
 
@@ -10,11 +11,13 @@ public class SensorsController : ControllerBase
 {
     private readonly TelemetryStore _store;
     private readonly IWebHostEnvironment _env;
+    private readonly RealTimeEngine _engine;
 
-    public SensorsController(TelemetryStore store, IWebHostEnvironment env)
+    public SensorsController(TelemetryStore store, IWebHostEnvironment env, RealTimeEngine engine)
     {
         _store = store;
         _env = env;
+        _engine = engine;
     }
 
     /// <summary>GET /api/sensors - every registered sensor (mock-seeded + user-registered).</summary>
@@ -29,10 +32,15 @@ public class SensorsController : ControllerBase
             return BadRequest("MAC Address is required.");
         if (string.IsNullOrWhiteSpace(sensor.Location))
             return BadRequest("Deployment location is required.");
+        if (!Regex.IsMatch(sensor.DeviceId ?? "", "^[A-Za-z0-9_-]{1,64}$") || !Enum.IsDefined(sensor.Category))
+            return BadRequest("Use a valid category and a device ID containing 1–64 letters, digits, underscores or hyphens.");
+        if (!Regex.IsMatch(sensor.MacAddress.Trim(), "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$") || sensor.Location.Length > 200)
+            return BadRequest("Use a colon-separated MAC address and a location of at most 200 characters.");
 
         sensor.RegisteredUtc = DateTime.UtcNow;
         sensor.IsMock = false;
-        _store.AddSensor(sensor);
+        try { _engine.RegisterDevice(sensor); }
+        catch (ArgumentException ex) { return Conflict(ex.Message); }
 
         return Created(string.Empty, sensor);
     }
@@ -64,7 +72,7 @@ public class SensorsController : ControllerBase
             await file.CopyToAsync(stream);
         }
 
-        sensor.AttachmentFileName = safeFileName;
+        _store.SetAttachment(sensor.DeviceId, safeFileName);
 
         return Ok(new { sensor.DeviceId, FileName = safeFileName, SizeBytes = file.Length });
     }

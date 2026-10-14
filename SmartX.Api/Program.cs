@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using SmartX.Core.Services;
+using SmartX.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,10 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddSingleton<TelemetryStore>();
+builder.Services.AddSingleton<RealTimeEngine>();
+builder.Services.AddHostedService<TelemetryProcessor>();
+builder.Services.AddSingleton<DeviceSimulator>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceSimulator>());
 
 var app = builder.Build();
 
@@ -35,12 +40,19 @@ app.MapGet("/", () => Results.Ok(new
         "GET  /api/telemetry/history/{deviceId}",
         "GET  /api/telemetry/aggregate",
         "GET  /api/deployment/tree",
-        "GET  /api/deployment/validate"
+        "GET  /api/deployment/validate",
+        "GET  /api/realtime/dashboard",
+        "GET  /api/realtime/devices/{deviceId}/timeline",
+        "POST /api/realtime/commands",
+        "POST /api/realtime/commands/undo",
+        "POST /api/realtime/searches",
+        "POST /api/realtime/simulation/start",
+        "POST /api/realtime/simulation/stop"
     }
 }));
 
-// Heavily seed the in-memory store on startup so the dashboard has data
-// to display immediately, per the assignment's data-seeding requirement.
+// Seed registration metadata only. Live readings, including simulated
+// readings, must enter through POST /api/telemetry/ingest.
 var store = app.Services.GetRequiredService<TelemetryStore>();
 store.SeedAll();
 

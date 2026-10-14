@@ -3,9 +3,12 @@ using System.Windows.Forms;
 
 namespace SmartX.Desktop.Forms;
 
-/// <summary>Startup landing page with three architectural pillars; only Telemetry is enabled for this phase.</summary>
+/// <summary>Nonblocking navigation with persistent module instances.</summary>
 public class MainMenuForm : Form
 {
+    private TelemetryForm? _telemetry;
+    private CommandStreamForm? _commands;
+
     public MainMenuForm()
     {
         Text = "Smart-X Gateway Console";
@@ -38,22 +41,17 @@ public class MainMenuForm : Form
             "Register devices, stream and inspect live readings.",
             130, true);
 
-        btnTelemetry.Click += (s, e) =>
-        {
-            Hide();
-            using var form = new TelemetryForm();
-            form.ShowDialog(this);
-            Show();
-        };
+        btnTelemetry.Click += (s, e) => OpenModule(ref _telemetry, () => new TelemetryForm());
 
         var btnCommand = CreatePillarButton(
             "Real-Time Command Stream & History",
-            "Disabled - scheduled for a later phase.",
-            210, false);
+            "Monitor live devices, issue overrides, undo and explore insights.",
+            210, true);
+        btnCommand.Click += (s, e) => OpenModule(ref _commands, () => new CommandStreamForm());
 
         var btnMesh = CreatePillarButton(
             "Network Topology & Mesh Routing",
-            "Disabled - scheduled for a later phase.",
+            "Future module - topology visualisation and mesh routing.",
             290, false);
 
         Controls.Add(title);
@@ -61,6 +59,28 @@ public class MainMenuForm : Form
         Controls.Add(btnTelemetry);
         Controls.Add(btnCommand);
         Controls.Add(btnMesh);
+    }
+
+    private void OpenModule<T>(ref T? module, Func<T> create) where T : ModuleForm
+    {
+        if (module is null || module.IsDisposed)
+        {
+            module = create();
+            module.BackToMenu += (s, e) => { Show(); Activate(); };
+        }
+        Hide();
+        module.Show();
+        module.Activate();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _telemetry?.Dispose();
+            _commands?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     // Pillar navigation buttons (GeeksforGeeks, 2025)

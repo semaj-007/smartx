@@ -21,22 +21,25 @@ public class TelemetryPacket<T> : ITelemetryPacket where T : struct
     public DateTime TimestampUtc { get; }
     public string Unit { get; }
 
-    public TelemetryPacket(string deviceId, SensorCategory category, T value, string unit)
+    public TelemetryPacket(string deviceId, SensorCategory category, T value, string unit, DateTime? timestampUtc = null)
     {
         PacketId = Guid.NewGuid().ToString("N");
         DeviceId = deviceId;
         Category = category;
         Value = value;
         Unit = unit;
-        TimestampUtc = DateTime.UtcNow;
+        TimestampUtc = timestampUtc is { } timestamp
+            ? timestamp.Kind == DateTimeKind.Local ? timestamp.ToUniversalTime() : DateTime.SpecifyKind(timestamp, DateTimeKind.Utc)
+            : DateTime.UtcNow;
     }
 
     /// <summary>Human-readable rendering of the strongly-typed value, used by the API and dashboard.</summary>
     public string FormattedValue => Value switch
     {
         bool b => b ? "OPEN" : "CLOSED",
-        float f => f.ToString("0.0"),
-        _ => Value!.ToString() ?? string.Empty
+        float f => f.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+        IFormattable value => value.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+        _ => Value.ToString() ?? string.Empty
     };
 
     public override string ToString() => $"[{TimestampUtc:HH:mm:ss}] {DeviceId} ({Category}) = {FormattedValue}{Unit}";

@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using SmartX.Core.Models;
@@ -8,17 +9,21 @@ using SmartX.Desktop.Dtos;
 namespace SmartX.Desktop.Forms;
 
 /// <summary>Sensor Data Ingestion & Telemetry dashboard: registration with file attachment, live grids, the Pulse Gauge, and recursion/operator-overload demos.</summary>
-public class TelemetryForm : Form
+public class TelemetryForm : ModuleForm
 {
-    private const string ApiBaseUrl = "http://localhost:5080/";
-
-    private readonly ApiClient _api = new(ApiBaseUrl);
+    private readonly ApiClient _api = new(ApiClient.DefaultBaseUrl);
     private readonly HashSet<string> _seenPacketIds = new();
+    private readonly Queue<string> _seenPacketOrder = new();
     private readonly System.Windows.Forms.Timer _refreshTimer;
+    private CancellationTokenSource? _activeCts;
+    private bool _refreshing;
+    private bool _ready;
+    private bool _registrationBusy;
 
     private string? _selectedFilePath;
 
     private TextBox _txtMac = null!;
+    private GroupBox _registerGroup = null!;
     private TextBox _txtLocation = null!;
     private ComboBox _cmbCategory = null!;
     private Label _lblFile = null!;
@@ -43,10 +48,7 @@ public class TelemetryForm : Form
         // Auto-refresh timer (Microsoft, n.d.)
         _refreshTimer = new System.Windows.Forms.Timer { Interval = 3000 };
         _refreshTimer.Tick += async (s, e) => await RefreshDataAsync();
-        _refreshTimer.Start();
-
-        Load += async (s, e) => await RefreshDataAsync();
-        FormClosed += (s, e) => _refreshTimer.Stop();
+        _ready = true;
     }
 
     private void BuildLayout()
@@ -71,7 +73,8 @@ public class TelemetryForm : Form
         Controls.Add(btnBack);
         Controls.Add(lblTitle);
 
-        Controls.Add(BuildRegisterGroup());
+        _registerGroup = BuildRegisterGroup();
+        Controls.Add(_registerGroup);
         Controls.Add(BuildSensorsGroup());
         Controls.Add(BuildPulseGroup());
         Controls.Add(BuildTelemetryGroup());
@@ -319,6 +322,7 @@ public class TelemetryForm : Form
 
     private async Task RegisterSensorAsync()
     {
+        if (_registrationBusy || IsDisposed) return;
         if (string.IsNullOrWhiteSpace(_txtMac.Text) || string.IsNullOrWhiteSpace(_txtLocation.Text) || _cmbCategory.SelectedItem is null)
         {
             _lblStatus.ForeColor = UiTheme.Error;
@@ -326,28 +330,43 @@ public class TelemetryForm : Form
             return;
         }
 
+        var attachment = _selectedFilePath;
+        SensorRow? registered = null;
+        _registrationBusy = true;
+        _registerGroup.Enabled = false;
         try
         {
             var category = _cmbCategory.SelectedItem.ToString()!;
-            var sensor = await _api.RegisterSensorAsync(_txtMac.Text.Trim(), _txtLocation.Text.Trim(), category);
+            registered = await _api.RegisterSensorAsync(_txtMac.Text.Trim(), _txtLocation.Text.Trim(), category)
+                ?? throw new InvalidOperationException("The API returned no registered device.");
 
-            if (sensor is not null && _selectedFilePath is not null)
-                await _api.UploadAttachmentAsync(sensor.DeviceId, _selectedFilePath);
+            if (IsDisposed) return;
 
-            _lblStatus.ForeColor = UiTheme.Accent;
-            _lblStatus.Text = $"Registered {sensor?.DeviceId}" + (_selectedFilePath is not null ? " with attachment." : ".");
-
+            // A completed submission is reconciled even when its retained module is hidden.
             _txtMac.Clear();
             _txtLocation.Clear();
             _selectedFilePath = null;
             _lblFile.Text = "(no file selected)";
 
+            if (attachment is not null)
+                await _api.UploadAttachmentAsync(registered.DeviceId, attachment);
+
+            if (IsDisposed) return;
+            _lblStatus.ForeColor = UiTheme.Accent;
+            _lblStatus.Text = $"Registered {registered.DeviceId}" + (attachment is not null ? " with attachment." : ".");
+
             await RefreshDataAsync();
         }
         catch (Exception ex)
         {
+            if (IsDisposed) return;
             _lblStatus.ForeColor = UiTheme.Error;
-            _lblStatus.Text = $"Registration failed: {ex.Message}";
+            _lblStatus.Text = registered is null ? $"Registration failed: {ex.Message}" : $"Registered {registered.DeviceId}; attachment failed: {ex.Message}";
+        }
+        finally
+        {
+            _registrationBusy = false;
+            if (!IsDisposed) _registerGroup.Enabled = true;
         }
     }
 
@@ -364,9 +383,11 @@ public class TelemetryForm : Form
             await _api.IngestTelemetryAsync(sensor.DeviceId, sensor.Category, valueType, value, unit);
             await RefreshDataAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Swallow - this is a manual demo trigger; the refresh timer will retry the connection.
+            if (IsDisposed) return;
+            _lblStatus.ForeColor = UiTheme.Error;
+            _lblStatus.Text = $"Could not send mock reading: {ex.Message}";
         }
     }
 
@@ -374,9 +395,9 @@ public class TelemetryForm : Form
     {
         return category switch
         {
-            nameof(SensorCategory.SoilMoisture) => ("float", Math.Round(Random.Shared.NextDouble() * 100, 1).ToString(), "%"),
-            nameof(SensorCategory.Temperature) => ("float", Math.Round(15 + Random.Shared.NextDouble() * 20, 1).ToString(), "C"),
-            nameof(SensorCategory.Humidity) => ("float", Math.Round(Random.Shared.NextDouble() * 100, 1).ToString(), "%RH"),
+            nameof(SensorCategory.SoilMoisture) => ("float", Math.Round(Random.Shared.NextDouble() * 100, 1).ToString(CultureInfo.InvariantCulture), "%"),
+            nameof(SensorCategory.Temperature) => ("float", Math.Round(15 + Random.Shared.NextDouble() * 20, 1).ToString(CultureInfo.InvariantCulture), "C"),
+            nameof(SensorCategory.Humidity) => ("float", Math.Round(Random.Shared.NextDouble() * 100, 1).ToString(CultureInfo.InvariantCulture), "%RH"),
             nameof(SensorCategory.PowerMeter) => ("int", Random.Shared.Next(50, 2500).ToString(), "W"),
             nameof(SensorCategory.LightLevel) => ("int", Random.Shared.Next(0, 10000).ToString(), "lux"),
             nameof(SensorCategory.ValveState) => ("bool", (Random.Shared.Next(2) == 1).ToString(), ""),
@@ -389,10 +410,12 @@ public class TelemetryForm : Form
         try
         {
             var json = await _api.ValidateDeploymentAsync();
+            if (IsDisposed) return;
             _txtValidateResult.Text = PrettyPrint(json);
         }
         catch (Exception ex)
         {
+            if (IsDisposed) return;
             _txtValidateResult.Text = $"Could not reach API: {ex.Message}";
         }
     }
@@ -402,10 +425,12 @@ public class TelemetryForm : Form
         try
         {
             var json = await _api.AggregateAsync();
+            if (IsDisposed) return;
             _txtAggregateResult.Text = PrettyPrint(json);
         }
         catch (Exception ex)
         {
+            if (IsDisposed) return;
             _txtAggregateResult.Text = $"Could not reach API: {ex.Message}";
         }
     }
@@ -426,18 +451,32 @@ public class TelemetryForm : Form
 
     private async Task RefreshDataAsync()
     {
+        if (_refreshing || !Visible || IsDisposed) return;
+        _refreshing = true;
+        var token = _activeCts?.Token ?? CancellationToken.None;
         try
         {
-            var sensors = await _api.GetSensorsAsync();
-            var telemetry = await _api.GetTelemetryAsync();
+            var sensorTask = _api.GetSensorsAsync(token);
+            var telemetryTask = _api.GetTelemetryAsync(cancellationToken: token);
+            await Task.WhenAll(sensorTask, telemetryTask);
+            var sensors = await sensorTask;
+            var telemetry = await telemetryTask;
 
-            if (IsDisposed) return;
+            if (IsDisposed || !Visible || token.IsCancellationRequested) return;
 
+            var selectedId = _dgvSensors.SelectedRows.Count > 0 ? _dgvSensors.SelectedRows[0].Cells[0].Value?.ToString() : null;
             _dgvSensors.Rows.Clear();
             foreach (var sensor in sensors)
             {
                 _dgvSensors.Rows.Add(sensor.DeviceId, sensor.MacAddress, sensor.Location, sensor.Category, sensor.AttachmentFileName ?? "-");
             }
+            foreach (DataGridViewRow row in _dgvSensors.Rows)
+                if (row.Cells[0].Value?.ToString() == selectedId)
+                {
+                    _dgvSensors.CurrentCell = row.Cells[0];
+                    row.Selected = true;
+                    break;
+                }
 
             _dgvTelemetry.Rows.Clear();
             foreach (var packet in telemetry)
@@ -445,12 +484,52 @@ public class TelemetryForm : Form
                 _dgvTelemetry.Rows.Add(packet.TimestampUtc.ToString("HH:mm:ss"), packet.DeviceId, packet.Category, packet.Value, packet.Unit);
 
                 if (_seenPacketIds.Add(packet.PacketId))
+                {
+                    _seenPacketOrder.Enqueue(packet.PacketId);
+                    if (_seenPacketOrder.Count > 2048) _seenPacketIds.Remove(_seenPacketOrder.Dequeue());
                     _pulseGauge.RegisterPing();
+                }
             }
         }
-        catch
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex)
         {
-            // API not reachable yet (e.g. still starting up) - the timer will retry.
+            if (IsDisposed || !Visible) return;
+            _lblStatus.ForeColor = UiTheme.Error;
+            _lblStatus.Text = $"Live refresh failed; retrying: {ex.Message}";
         }
+        finally { _refreshing = false; }
+    }
+
+    protected override async void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (!_ready || _refreshTimer is null || IsDisposed) return;
+        if (Visible)
+        {
+            _activeCts?.Dispose();
+            _activeCts = new CancellationTokenSource();
+            _refreshTimer.Start();
+            await RefreshDataAsync();
+        }
+        else
+        {
+            _refreshTimer.Stop();
+            _activeCts?.Cancel();
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _ready = false;
+            _refreshTimer?.Stop();
+            _activeCts?.Cancel();
+            _refreshTimer?.Dispose();
+            _activeCts?.Dispose();
+            _api.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

@@ -29,7 +29,7 @@ public class PulseGaugeControl : Control
         // Pulse sweep timer (Microsoft, n.d.)
         _timer = new System.Windows.Forms.Timer { Interval = 40 };
         _timer.Tick += (s, e) => Tick();
-        _timer.Start();
+        if (Visible) _timer.Start();
     }
 
     /// <summary>Called by the dashboard every time a new telemetry packet is observed.</summary>
@@ -37,6 +37,14 @@ public class PulseGaugeControl : Control
     {
         _blips.Add(new Blip { Angle = Random.Shared.NextDouble() * 360.0, Life = 1.0 });
         _packetsThisSecond++;
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (_timer is null || IsDisposed || Disposing) return;
+        if (Visible) _timer.Start();
+        else _timer.Stop();
     }
 
     private void Tick()
