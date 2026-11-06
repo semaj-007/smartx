@@ -8,6 +8,7 @@ public class MainMenuForm : Form
 {
     private TelemetryForm? _telemetry;
     private CommandStreamForm? _commands;
+    private NetworkTopologyForm? _network;
 
     public MainMenuForm()
     {
@@ -51,8 +52,9 @@ public class MainMenuForm : Form
 
         var btnMesh = CreatePillarButton(
             "Network Topology & Mesh Routing",
-            "Future module - topology visualisation and mesh routing.",
-            290, false);
+            "Explore mesh routes, spanning trees and indexed sensor history.",
+            290, true);
+        btnMesh.Click += (s, e) => OpenModule(ref _network, () => new NetworkTopologyForm());
 
         Controls.Add(title);
         Controls.Add(subtitle);
@@ -61,6 +63,7 @@ public class MainMenuForm : Form
         Controls.Add(btnMesh);
     }
 
+    // Modeless forms preserve module state while the message loop remains responsive (Microsoft, n.d.-i).
     private void OpenModule<T>(ref T? module, Func<T> create) where T : ModuleForm
     {
         if (module is null || module.IsDisposed)
@@ -79,11 +82,12 @@ public class MainMenuForm : Form
         {
             _telemetry?.Dispose();
             _commands?.Dispose();
+            _network?.Dispose();
         }
         base.Dispose(disposing);
     }
 
-    // Pillar navigation buttons (GeeksforGeeks, 2025)
+    // Pillar navigation buttons (Microsoft, n.d.-e)
     private static Button CreatePillarButton(string title, string description, int top, bool enabled)
     {
         var button = new Button

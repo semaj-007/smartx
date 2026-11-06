@@ -7,12 +7,12 @@ using SmartX.Desktop.Dtos;
 namespace SmartX.Desktop;
 
 /// <summary>Thin HttpClient wrapper for the SmartX ingestion API, using plain System.Text.Json.</summary>
-// HttpClient GET/POST requests (GeeksforGeeks, 2022)
+// HttpClient GET/POST requests (Microsoft, n.d.-m)
 public partial class ApiClient : IDisposable
 {
     private readonly HttpClient _http;
 
-    // JSON serialization (Microsoft, n.d.)
+    // JSON serialization (Microsoft, n.d.-o)
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true

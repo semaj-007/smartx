@@ -34,6 +34,7 @@ public partial class ApiClient
     public Task SetSimulationAsync(bool running, CancellationToken token) =>
         PostRealtimeAsync($"api/realtime/simulation/{(running ? "start" : "stop")}", new { }, token);
 
+    // Await HTTP requests to keep the desktop message loop responsive (Microsoft, n.d.-c).
     private async Task<T> GetRealtimeAsync<T>(string path, CancellationToken token)
     {
         using var response = await _http.GetAsync(path, token);
