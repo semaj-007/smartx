@@ -7,6 +7,7 @@ public class TelemetryStore
 {
     private readonly object _gate = new();
     // Dictionary lookup replaces a linear scan for each device ingestion.
+    // Dictionary keys index registered devices directly (Microsoft, n.d.-g).
     private readonly Dictionary<string, SensorRegistration> _sensors = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _deviceByMac = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<ITelemetryPacket> _packets = new();
@@ -77,6 +78,8 @@ public class TelemetryStore
         if (string.IsNullOrWhiteSpace(sensor.DeviceId) || string.IsNullOrWhiteSpace(sensor.MacAddress)
             || string.IsNullOrWhiteSpace(sensor.Location) || !Enum.IsDefined(sensor.Category))
             throw new ArgumentException("Device id, MAC address, location and a valid category are required.");
+        if (string.Equals(sensor.DeviceId, MeshNetworkService.GatewayId, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("GATEWAY is reserved for the mesh server.", nameof(sensor));
         lock (_gate)
         {
             if (_sensors.ContainsKey(sensor.DeviceId))

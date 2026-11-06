@@ -1,4 +1,5 @@
 using System.Globalization;
+using SmartX.Core.DataStructures;
 using SmartX.Core.Models;
 
 namespace SmartX.Core.Services;
@@ -21,15 +22,20 @@ public sealed class RealTimeEngine
 
     // Queue<T> guarantees FIFO for normal telemetry. Critical packets have a separate
     // priority queue, ordered by severity then arrival, and bypass the normal backlog.
+    // Queue<T> buffers standard packets in first-in, first-out order (Microsoft, n.d.-t).
     private readonly Queue<ITelemetryPacket> _standardQueue = new();
+    // PriorityQueue removes the lowest priority key first for critical handling (Microsoft, n.d.-s).
     private readonly PriorityQueue<ITelemetryPacket, (int Severity, long Arrival)> _criticalQueue = new();
     private readonly Dictionary<string, Queue<long>> _pendingArrivalOrder = new(StringComparer.Ordinal);
+    // Dictionary keys provide direct device-state lookup (Microsoft, n.d.-g).
     private readonly Dictionary<string, DeviceState> _devices = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<TelemetryLog> _recentTelemetry = new();
 
     // The HashSet holds unique device/error pairs. Repeated disconnect or threshold
     // alerts are idempotent, and recovery removes the corresponding pair.
+    // HashSet stores unique device/error pairs (Microsoft, n.d.-l).
     private readonly HashSet<(string DeviceId, string Code)> _activeAlerts = new();
+    // Stack retains manual command snapshots in last-in, first-out order (Microsoft, n.d.-w).
     private Stack<CommandEntry> _undoHistory = new();
     private readonly List<CommandEntry> _commandHistory = new();
 
@@ -55,6 +61,7 @@ public sealed class RealTimeEngine
     public void RegisterDevice(SensorRegistration sensor)
     {
         ArgumentNullException.ThrowIfNull(sensor);
+        // Mutual exclusion protects compound updates across request and worker threads (Microsoft, n.d.-x).
         lock (_gate)
         {
             // The store rejects duplicate ids/MACs before any engine state is changed.
@@ -268,8 +275,33 @@ public sealed class RealTimeEngine
         {
             if (!_devices.TryGetValue(deviceId, out var device))
                 throw new InvalidOperationException($"Device '{deviceId}' is not registered.");
-            return device.Timeline.Values.SelectMany(bucket => bucket)
-                .TakeLast(Math.Min(count, MaximumTimelineEntries)).ToArray();
+            return device.Timeline.Latest(Math.Min(count, MaximumTimelineEntries));
+        }
+    }
+
+    /// <summary>Queries the retained AVL history by inclusive UTC timestamp bounds.</summary>
+    public TelemetryRangeResult GetHistoryRange(string deviceId, DateTime fromUtc, DateTime toUtc, int limit = 1000)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+            throw new ArgumentException("A device id is required.", nameof(deviceId));
+        lock (_gate)
+        {
+            if (!_devices.TryGetValue(deviceId, out var device))
+                throw new InvalidOperationException($"Device '{deviceId}' is not registered.");
+            return device.Timeline.Query(fromUtc, toUtc, limit);
+        }
+    }
+
+    /// <summary>Separate ordered minute-count snapshot; range queries do not enumerate this summary.</summary>
+    public IReadOnlyDictionary<DateTime, int> GetHistoryBuckets(string deviceId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+            throw new ArgumentException("A device id is required.", nameof(deviceId));
+        lock (_gate)
+        {
+            if (!_devices.TryGetValue(deviceId, out var device))
+                throw new InvalidOperationException($"Device '{deviceId}' is not registered.");
+            return device.Timeline.TimeBuckets;
         }
     }
 
@@ -325,20 +357,9 @@ public sealed class RealTimeEngine
         if (_recentTelemetry.Count > MaximumRecentTelemetry)
             _recentTelemetry.Dequeue();
 
-        // SortedDictionary orders timestamps in O(log n). Lists preserve collisions
-        // rather than silently overwriting packets that share a device clock timestamp.
-        if (!device.Timeline.TryGetValue(log.TimestampUtc, out var bucket))
-            device.Timeline.Add(log.TimestampUtc, bucket = new List<TelemetryLog>());
-        bucket.Add(log);
-        device.TimelineCount++;
-        while (device.TimelineCount > MaximumTimelineEntries)
-        {
-            var first = device.Timeline.First();
-            first.Value.RemoveAt(0);
-            if (first.Value.Count == 0)
-                device.Timeline.Remove(first.Key);
-            device.TimelineCount--;
-        }
+        // Timestamp/sequence keys retain equal-timestamp readings, while AVL
+        // rebalancing keeps live insertion and range lookup efficient (Shaffer, n.d.-a).
+        device.Timeline.Add(log);
 
         device.LastReceivedUtc = now;
         device.IsConnected = true;
@@ -478,7 +499,7 @@ public sealed class RealTimeEngine
         if (!device.IsConnected || category is not (SensorCategory.SoilMoisture or SensorCategory.PowerMeter)
             || device.Alerts.Contains("CriticalMoisture") || device.Alerts.Contains("PowerSpike"))
             return null;
-        var samples = device.Timeline.Values.SelectMany(bucket => bucket)
+        var samples = device.Timeline.Latest(8)
             .Where(log => log.NumericValue.HasValue).TakeLast(8).ToArray();
         if (samples.Length < 4)
             return null;
@@ -490,6 +511,7 @@ public sealed class RealTimeEngine
         var variance = x.Sum(value => (value - meanX) * (value - meanX));
         if (variance <= 0 || x[^1] <= 0)
             return null;
+        // Least-squares slope is covariance divided by timestamp variance (Math.NET Project, n.d.).
         var covariance = x.Select((value, index) => (value - meanX) * (y[index] - meanY)).Sum();
         var slope = covariance / variance;
         var totalVariance = y.Sum(value => (value - meanY) * (value - meanY));
@@ -561,8 +583,7 @@ public sealed class RealTimeEngine
         public bool IsOn { get; set; }
         public bool HasManualOverride { get; set; }
         public HashSet<string> Alerts { get; } = new(StringComparer.Ordinal);
-        public SortedDictionary<DateTime, List<TelemetryLog>> Timeline { get; } = new();
-        public int TimelineCount { get; set; }
+        public TelemetryHistoryIndex Timeline { get; } = new(MaximumTimelineEntries);
 
         public DeviceState(SensorRegistration registration)
         {

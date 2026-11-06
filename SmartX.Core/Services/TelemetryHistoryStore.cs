@@ -29,6 +29,7 @@ public class TelemetryHistoryStore
         }
     }
 
+    // Jagged arrays represent batches with different lengths (Microsoft, n.d.-b).
     public double[][] RawBatches
     {
         get

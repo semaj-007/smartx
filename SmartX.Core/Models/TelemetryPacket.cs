@@ -12,6 +12,7 @@ namespace SmartX.Core.Models;
 /// TelemetryPacket&lt;int&gt;, TelemetryPacket&lt;bool&gt;, ...) can be
 /// handled uniformly wherever ITelemetryPacket is used.
 /// </summary>
+// Generic type parameters preserve the native sensor value type (Microsoft, n.d.-j).
 public class TelemetryPacket<T> : ITelemetryPacket where T : struct
 {
     public string PacketId { get; }
