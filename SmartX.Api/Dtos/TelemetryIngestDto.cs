@@ -7,6 +7,7 @@ namespace SmartX.Api.Dtos;
 /// <summary>Inbound payload for POST /api/telemetry/ingest.</summary>
 public class TelemetryIngestDto
 {
+    // Validation attributes declare required input and length constraints (Microsoft, n.d.-p).
     [Required, StringLength(64)]
     public string DeviceId { get; set; } = string.Empty;
     [JsonRequired]
