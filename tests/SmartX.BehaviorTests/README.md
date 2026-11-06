@@ -16,3 +16,9 @@ The artifacts directory keeps generated outputs outside the checkout. The runner
 uses only the actual Core implementation and does not require NuGet test packages,
 an API process, a database, or a Windows desktop session. API/device HTTP integration
 and the desktop application require their separate smoke checks.
+
+Phase 3 adds AVL rotation/range/pruning/retention checks and graph routing, MAC
+lookup, Prim forest, subnet classification, link failure and concurrency checks.
+`python3 tests/smoke_mesh_api.py` validates the mesh and indexed history endpoints
+through actual HTTP ingestion. Run HTTP suites against a dedicated running API;
+they register fixtures and mutate simulated links and device state.

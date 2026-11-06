@@ -138,7 +138,7 @@ manual refresh needed.
 - Storage is entirely **in-memory** for this simulation phase (restarting
   `SmartX.Api` resets all data and re-seeds).
 - Sensor ingestion and the real-time command stream are active modules.
-  Network topology and mesh routing remain scheduled for a future part.
+  Network topology and mesh routing are available in the third active module.
 - Uploaded attachments are written to `SmartX.Api/App_Data/uploads/`.
 
 
@@ -146,7 +146,7 @@ manual refresh needed.
 
 Open **Real-Time Command Stream & History** from the desktop main menu. Both active
 modules stay alive when you return to the menu, retaining inputs, filters, selection,
-and API state. The mesh module remains marked as future work. Network operations are
+and API state. The network topology module is also active. Network operations are
 asynchronous, polling never overlaps, and hidden modules pause refreshes.
 
 Choose **Start Simulation** to run the opt-in virtual fleet, or send physical-device
@@ -238,3 +238,72 @@ issue commands, train suggestions and start/stop the simulator. Set `SMARTX_API_
 for a different API URL. The dependency-free Core runner tests processing order,
 alerts, retention, undo and predictions without requiring Windows. Build artifacts
 are redirected because this repository contains tracked historical bin/obj files.
+
+
+## Network topology and mesh routing (Part 3)
+
+All three main-menu modules are active and preserve their controls and selections
+when navigating through the menu. Open **Network Topology & Mesh Routing**, then
+start the device simulator. Device liveness comes from telemetry sent through the
+HTTP API; wireless edges and their positive transmission-energy costs are simulated.
+No hardware radio discovery or measured power consumption is claimed.
+
+The mesh dashboard provides:
+
+- Clickable device/gateway graph, ID and MAC lookup, online/offline colouring,
+  weighted links, route highlighting and a minimum-spanning-tree overlay.
+- **BFS** for minimum-hop routes, **Dijkstra** for minimum-cost individual routes,
+  and **Prim backbone path** for routes restricted to the minimum spanning forest.
+- Subnet discovery from any selected node or gateway, listing reachable devices,
+  offline devices and online devices outside the reachable component.
+- Editable wireless links: change cost, disable or remove an edge to observe live
+  rerouting; restore the link to reconnect the component.
+- UTC date-range controls, a chronological telemetry grid and graph, and AVL
+  diagnostics showing retained readings, tree height, nodes visited and truncation.
+
+Prim minimises the sum of selected link energy costs in each active component.
+A disconnected graph produces a minimum spanning forest and an explicit component
+count. A tree path is not necessarily the cheapest route for one source/destination;
+Dijkstra supplies that comparison. Offline devices and disabled links cannot relay
+traffic. The gateway remains online as the API server vertex.
+
+Each sensor now owns a custom AVL tree keyed by UTC timestamp and processing
+sequence. Explicit single/double rotations and balanced minimum deletion support
+O(log n) insertion/eviction; inclusive range queries prune irrelevant subtrees in
+O(log n + k). Equal timestamps remain separate observations. Retention is the newest
+1,000 observations per device, and queries report when their result limit truncates
+the interval. History and links reset when the API restarts. A separate
+SortedDictionary maintains ordered minute counts for retained readings.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/api/mesh/topology` | Device graph, link availability and Prim forest |
+| GET | `/api/mesh/traversal?from=GATEWAY` | BFS reachable/offline/isolated classification |
+| GET | `/api/mesh/route?from=MOISTURE-B&to=GATEWAY&algorithm=bfs` | BFS, dijkstra or mst route by ID/MAC |
+| GET | `/api/mesh/history?device=MOISTURE-B&fromUtc=2026-11-06T14:00:00Z&toUtc=2026-11-06T16:00:00Z&limit=1000` | Inclusive AVL timestamp range |
+| PUT | `/api/mesh/links` | `{ source, target, cost, enabled }` simulated edge update |
+| DELETE | `/api/mesh/links?source=MOISTURE-B&target=GATEWAY` | Remove a simulated edge |
+
+Historical bounds accept ISO 8601 timestamps with UTC or an explicit offset. An
+unreachable route returns HTTP 200 with `found: false` and an explanation; invalid
+requests return 400 and unknown devices return 404. `GATEWAY` is reserved.
+
+Run the existing core runner plus the device HTTP suites against a dedicated API:
+
+```sh
+dotnet run --project tests/SmartX.BehaviorTests --artifacts-path /tmp/smartx-tests
+python3 tests/smoke_api.py
+python3 tests/smoke_mesh_api.py
+```
+
+The tests cover all four AVL rotation patterns, randomized ranges against a sorted
+oracle, pruning, retention, timestamp collisions, known MST weights, BFS/Dijkstra
+comparisons, MAC aliases, subnet discovery, failures/recovery and concurrency.
+Windows Forms cross-compiles on Linux; interactive visual validation requires Windows.
+
+For a video: start simulation, trace a MAC to GATEWAY, compare BFS/Dijkstra/Prim,
+enable the tree overlay, disable a route link and show the new hops, isolate a node
+and run subnet discovery, restore it, then query a narrow UTC telemetry range and
+show the chronological results and AVL visitation diagnostics. Navigate through all
+three modules to demonstrate retained state. Harvard citations precede relevant
+logic; the full reference list is in `SmartX.Desktop/Program.cs`.

@@ -31,6 +31,7 @@ var tests = new (string Name, Action Run)[]
     ("Flat readings do not produce an early trend warning", Checks.FlatTrend),
     ("Concurrent ingestion and snapshots preserve packet accounting", Checks.ConcurrentIngestion)
 };
+tests = tests.Concat(Phase3Checks.Tests).ToArray();
 
 var failed = 0;
 var elapsed = Stopwatch.StartNew();
@@ -49,7 +50,7 @@ foreach (var test in tests)
 }
 
 Console.WriteLine($"{tests.Length - failed}/{tests.Length} behavior checks passed; " +
-                  $"{Checks.Assertions} assertions; {elapsed.Elapsed.TotalSeconds:0.00}s.");
+                  $"{Checks.Assertions + Phase3Checks.Assertions} assertions; {elapsed.Elapsed.TotalSeconds:0.00}s.");
 return failed == 0 ? 0 : 1;
 
 internal static class Checks
