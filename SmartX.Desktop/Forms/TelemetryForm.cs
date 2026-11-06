@@ -45,7 +45,7 @@ public class TelemetryForm : ModuleForm
 
         BuildLayout();
 
-        // Auto-refresh timer (Microsoft, n.d.)
+        // Auto-refresh timer (Microsoft, n.d.-y)
         _refreshTimer = new System.Windows.Forms.Timer { Interval = 3000 };
         _refreshTimer.Tick += async (s, e) => await RefreshDataAsync();
         _ready = true;
@@ -81,7 +81,7 @@ public class TelemetryForm : ModuleForm
         Controls.Add(BuildToolsGroup());
     }
 
-    // Card container (GroupBox class) (GeeksforGeeks, 2025)
+    // Card container (GroupBox class) (Microsoft, n.d.-e)
     private static GroupBox CreateCard(string title, Point location, Size size)
     {
         return new GroupBox
@@ -96,7 +96,7 @@ public class TelemetryForm : ModuleForm
     }
 
     /// <summary>Consistent styling for every non-primary button, so nothing falls back to default system colours.</summary>
-    // Button styling (GeeksforGeeks, 2025)
+    // Button styling (Microsoft, n.d.-e)
     private static Button StyleSecondaryButton(Button button)
     {
         button.FlatStyle = FlatStyle.Flat;
@@ -134,12 +134,12 @@ public class TelemetryForm : ModuleForm
         _txtLocation = new TextBox { Location = new Point(15, 128), Size = new Size(290, 23) };
 
         var lblCategory = new Label { Text = "Sensor Category", Location = new Point(15, 160), AutoSize = true, ForeColor = UiTheme.TextPrimary };
-        // Sensor Category ComboBox (GeeksforGeeks, 2025)
+        // Sensor Category ComboBox (Microsoft, n.d.-e)
         _cmbCategory = new ComboBox { Location = new Point(15, 180), Size = new Size(290, 23), DropDownStyle = ComboBoxStyle.DropDownList };
         _cmbCategory.Items.AddRange(Enum.GetNames<SensorCategory>());
         if (_cmbCategory.Items.Count > 0) _cmbCategory.SelectedIndex = 0;
 
-        // Attach File (Microsoft, n.d.)
+        // Attach File (Microsoft, n.d.-q)
         var btnAttach = StyleSecondaryButton(new Button { Text = "Attach File...", Location = new Point(15, 215), Size = new Size(150, 28) });
         _lblFile = new Label { Text = "(no file selected)", Location = new Point(175, 220), Size = new Size(140, 40), ForeColor = UiTheme.TextSecondary };
         btnAttach.Click += (s, e) => PickAttachment();
@@ -262,7 +262,7 @@ public class TelemetryForm : ModuleForm
         return group;
     }
 
-    // Registered Sensors / Telemetry grid (Microsoft, n.d.)
+    // Registered Sensors / Telemetry grid (Microsoft, n.d.-e)
     private static DataGridView CreateGrid(Point location, Size size)
     {
         var grid = new DataGridView
@@ -312,7 +312,7 @@ public class TelemetryForm : ModuleForm
         }
     }
 
-    // Generate Mock MAC (GeeksforGeeks, 2025)
+    // Generate Mock MAC (Microsoft, n.d.-u)
     private static string GenerateMockMac()
     {
         var bytes = new byte[6];
@@ -435,7 +435,7 @@ public class TelemetryForm : ModuleForm
         }
     }
 
-    // Pretty-print JSON (Microsoft, n.d.)
+    // Pretty-print JSON (Microsoft, n.d.-o)
     private static string PrettyPrint(string json)
     {
         try

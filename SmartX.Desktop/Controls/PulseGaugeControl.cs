@@ -26,7 +26,7 @@ public class PulseGaugeControl : Control
         DoubleBuffered = true;
         BackColor = Color.FromArgb(22, 28, 25);
 
-        // Pulse sweep timer (Microsoft, n.d.)
+        // Pulse sweep timer (Microsoft, n.d.-y)
         _timer = new System.Windows.Forms.Timer { Interval = 40 };
         _timer.Tick += (s, e) => Tick();
         if (Visible) _timer.Start();
@@ -68,7 +68,7 @@ public class PulseGaugeControl : Control
         Invalidate();
     }
 
-    // Custom GDI+ drawing (GeeksforGeeks, 2019)
+    // Custom GDI+ drawing (Microsoft, n.d.-k)
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);

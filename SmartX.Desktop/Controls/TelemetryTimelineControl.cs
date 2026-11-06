@@ -68,6 +68,7 @@ public sealed class TelemetryTimelineControl : Control
         }
     }
 
+    // Custom paint events render the telemetry timeline (Microsoft, n.d.-k).
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);

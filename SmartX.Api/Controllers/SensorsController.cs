@@ -32,6 +32,8 @@ public class SensorsController : ControllerBase
             return BadRequest("MAC Address is required.");
         if (string.IsNullOrWhiteSpace(sensor.Location))
             return BadRequest("Deployment location is required.");
+        if (string.Equals(sensor.DeviceId, "GATEWAY", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("GATEWAY is reserved for the mesh server.");
         if (!Regex.IsMatch(sensor.DeviceId ?? "", "^[A-Za-z0-9_-]{1,64}$") || !Enum.IsDefined(sensor.Category))
             return BadRequest("Use a valid category and a device ID containing 1–64 letters, digits, underscores or hyphens.");
         if (!Regex.IsMatch(sensor.MacAddress.Trim(), "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$") || sensor.Location.Length > 200)
@@ -52,6 +54,7 @@ public class SensorsController : ControllerBase
     /// </summary>
     [HttpPost("{deviceId}/attachment")]
     [RequestSizeLimit(20_000_000)]
+    // IFormFile represents a multipart form upload (Microsoft, n.d.-n).
     public async Task<IActionResult> UploadAttachment(string deviceId, IFormFile file)
     {
         var sensor = _store.FindSensor(deviceId);
@@ -67,6 +70,7 @@ public class SensorsController : ControllerBase
         var safeFileName = $"{deviceId}_{Path.GetFileName(file.FileName)}";
         var fullPath = Path.Combine(uploadsDir, safeFileName);
 
+        // File streams write uploaded attachment bytes asynchronously (Microsoft, n.d.-h).
         await using (var stream = new FileStream(fullPath, FileMode.Create))
         {
             await file.CopyToAsync(stream);

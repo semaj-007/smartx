@@ -18,6 +18,7 @@ builder.Services.AddControllers()
 
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddSingleton<RealTimeEngine>();
+builder.Services.AddSingleton<MeshNetworkService>();
 builder.Services.AddHostedService<TelemetryProcessor>();
 builder.Services.AddSingleton<DeviceSimulator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceSimulator>());
@@ -47,7 +48,13 @@ app.MapGet("/", () => Results.Ok(new
         "POST /api/realtime/commands/undo",
         "POST /api/realtime/searches",
         "POST /api/realtime/simulation/start",
-        "POST /api/realtime/simulation/stop"
+        "POST /api/realtime/simulation/stop",
+        "GET  /api/mesh/topology",
+        "GET  /api/mesh/traversal?from={deviceIdOrMac}",
+        "GET  /api/mesh/route?from={deviceIdOrMac}&to=GATEWAY&algorithm=bfs",
+        "GET  /api/mesh/history?device={deviceIdOrMac}&fromUtc={isoUtc}&toUtc={isoUtc}",
+        "PUT  /api/mesh/links",
+        "DELETE /api/mesh/links?source={deviceIdOrMac}&target={deviceIdOrMac}"
     }
 }));
 

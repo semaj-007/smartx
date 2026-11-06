@@ -23,6 +23,7 @@ public struct SensorReading
         Unit = unit;
     }
 
+    // User-defined operators implement compatible reading arithmetic (Microsoft, n.d.-r).
     public static SensorReading operator +(SensorReading a, SensorReading b)
     {
         EnsureCompatible(a, b);
